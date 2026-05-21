@@ -1,1066 +1,3 @@
-ChatGPT
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-{7CFD2061-F0AF-4A54-9795-EEB5A8966BC8}.png
-vamos a empezar desde un punto creativo: imagen para promocionar el inicio del desarrollo del mod, necesito algo con la fuente original del titulo de balatro, también nos podemos basar en el famoso mod CODEX ARCANUM , necesitaré un titulo de este estilo con 
-
-AD ASTRA
-
-Thought for 51s
-Imagen generada: Ad Astra in cosmic glow
-
-
-Editar
-
-
-Dejó de pensar
-Imagen generada: Ad Astra: El Vacío te llama
-
-
-Editar
-
-
-https://itayfeder.github.io/Codex-Arcanum/ en esta pagina están usando el shader de fondo de balatro a modo de fondo, necesito el codigo de shader de balatro para hacer ese efecto bajo mis colores, es posible? 
-
-Pensó durante 1m 39s
-Sí, es posible. He revisado la página de Codex Arcanum y efectivamente no parece ser una imagen estática: usa shader-web-background, define un fragment shader dentro del propio index.html, y le pasa iResolution e iTime para animarlo en pantalla. En su shader, los colores principales están definidos como colour_1, colour_2 y colour_3, justo lo que nos interesa cambiar para Ad Astra. 
-
-Eso sí: yo no te recomendaría copiar directamente el shader original de Balatro tal cual desde los archivos del juego. Mejor hacemos una recreación propia inspirada en ese efecto, con tus colores, tu identidad visual y preparada para tu web/promoción del mod. Además, el repo de Codex Arcanum aparece con licencia GPL-3.0, así que si tomas código directamente de ahí conviene respetar créditos/licencia. 
-
-Te dejo una primera versión Ad Astra, estilo fondo cósmico/espiral/vacío:
-
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ad Astra - Balatro Mod</title>
-
-  <script src="https://xemantic.github.io/shader-web-background/dist/shader-web-background.min.js"></script>
-
-  <script type="x-shader/x-fragment" id="ad_astra_background">
-    precision mediump float;
-
-    uniform vec2 iResolution;
-    uniform float iTime;
-
-    #define PI 3.14159265359
-
-    // COLORES AD ASTRA
-    #define VOID_BLACK vec4(0.015, 0.008, 0.035, 1.0)
-    #define NEBULA_PURPLE vec4(0.52, 0.13, 0.95, 1.0)
-    #define COSMIC_CYAN vec4(0.00, 0.92, 0.88, 1.0)
-    #define STAR_GOLD vec4(1.00, 0.72, 0.25, 1.0)
-
-    float hash(vec2 p) {
-      return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
-    }
-
-    float noise(vec2 p) {
-      vec2 i = floor(p);
-      vec2 f = fract(p);
-
-      float a = hash(i);
-      float b = hash(i + vec2(1.0, 0.0));
-      float c = hash(i + vec2(0.0, 1.0));
-      float d = hash(i + vec2(1.0, 1.0));
-
-      vec2 u = f * f * (3.0 - 2.0 * f);
-
-      return mix(a, b, u.x)
-           + (c - a) * u.y * (1.0 - u.x)
-           + (d - b) * u.x * u.y;
-    }
-
-    void main() {
-      vec2 frag = gl_FragCoord.xy;
-
-      // Pixelado suave, rollo Balatro/web retro
-      float pixelSize = 2.0;
-      frag = floor(frag / pixelSize) * pixelSize;
-
-      vec2 uv = (frag - 0.5 * iResolution.xy) / min(iResolution.x, iResolution.y);
-
-      float r = length(uv);
-      float angle = atan(uv.y, uv.x);
-
-      // Espiral tipo vacío / agujero negro
-      float swirl = 3.5 / (r + 0.18);
-      angle += swirl + iTime * 0.22;
-
-      vec2 spiralUV = vec2(cos(angle), sin(angle)) * r;
-
-      // Nebulosa procedural
-      vec2 p = spiralUV * 4.5;
-      p.x += sin(iTime * 0.35 + p.y * 1.7) * 0.45;
-      p.y += cos(iTime * 0.25 + p.x * 1.3) * 0.35;
-
-      float n1 = noise(p * 2.0 + iTime * 0.12);
-      float n2 = noise(p * 5.0 - iTime * 0.08);
-      float nebula = smoothstep(0.18, 0.95, n1 * 0.75 + n2 * 0.45);
-
-      // Disco central oscuro
-      float blackHole = smoothstep(0.28, 0.05, r);
-
-      // Anillo de acreción
-      float ring = smoothstep(0.24, 0.20, abs(r - 0.32));
-      ring *= 1.0 + 0.35 * sin(angle * 10.0 + iTime * 2.0);
-
-      // Estrellas
-      vec2 starUV = floor(frag / 3.0);
-      float starSeed = hash(starUV);
-      float stars = step(0.995, starSeed);
-      stars *= 0.5 + 0.5 * sin(iTime * 4.0 + starSeed * 20.0);
-
-      vec4 color = VOID_BLACK;
-
-      color = mix(color, NEBULA_PURPLE, nebula * 0.75);
-      color = mix(color, COSMIC_CYAN, n2 * 0.35);
-      color += STAR_GOLD * ring * 0.55;
-      color += vec4(vec3(stars), 1.0);
-
-      // Oscurecer el centro del vacío
-      color = mix(color, vec4(0.0, 0.0, 0.0, 1.0), blackHole);
-
-      // Viñeta
-      float vignette = smoothstep(1.15, 0.25, r);
-      color.rgb *= vignette;
-
-      // Pequeño pulso cósmico
-      color.rgb *= 0.92 + 0.08 * sin(iTime * 1.5);
-
-      gl_FragColor = color;
-    }
-  </script>
-
-  <style>
-    html,
-    body {
-      margin: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #02000a;
-      color: white;
-      font-family: monospace;
-    }
-
-    .overlay {
-      position: relative;
-      z-index: 2;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      pointer-events: none;
-    }
-
-    .title {
-      font-size: clamp(3rem, 10vw, 9rem);
-      letter-spacing: 0.08em;
-      text-shadow:
-        0 0 8px #7d2cff,
-        0 0 18px #00fff0,
-        4px 4px 0 #000;
-    }
-
-    .subtitle {
-      margin-top: 1rem;
-      font-size: clamp(1rem, 2vw, 2rem);
-      color: #d8c7ff;
-      text-shadow: 2px 2px 0 #000;
-    }
-  </style>
-</head>
-
-<body>
-  <script>
-    let t = 0;
-
-    requestAnimationFrame(function update() {
-      t += 1 / 60;
-      requestAnimationFrame(update);
-    });
-
-    shaderWebBackground.shade({
-      shaders: {
-        ad_astra_background: {
-          uniforms: {
-            iResolution: (gl, loc, ctx) => gl.uniform2f(loc, ctx.width, ctx.height),
-            iTime: (gl, loc) => gl.uniform1f(loc, t)
-          }
-        }
-      }
-    });
-  </script>
-
-  <div class="overlay">
-    <div>
-      <div class="title">AD ASTRA</div>
-      <div class="subtitle">El Vacío despierta</div>
-    </div>
-  </div>
-</body>
-</html>
-Los colores principales están aquí:
-
-#define VOID_BLACK vec4(0.015, 0.008, 0.035, 1.0)
-#define NEBULA_PURPLE vec4(0.52, 0.13, 0.95, 1.0)
-#define COSMIC_CYAN vec4(0.00, 0.92, 0.88, 1.0)
-#define STAR_GOLD vec4(1.00, 0.72, 0.25, 1.0)
-Para Ad Astra, yo partiría de esta paleta:
-
-Negro vacío:   #04020A
-Morado astral: #8421F2
-Cian cósmico:  #00EBE0
-Dorado estelar:#FFB83F
-Azul profundo: #07162E
-Mi recomendación: este shader lo usamos como fondo web/promocional del mod. Para meterlo dentro de Balatro como shader real del mod, tendríamos que adaptarlo a formato .fs de LÖVE/Balatro, que es parecido pero no exactamente igual.
-
-
-eso lo puedo meter en shadertoy?
-
-Pensó durante 12s
-Sí, pero no puedes pegar el HTML entero en ShaderToy. En ShaderToy solo tienes que pegar el fragment shader, usando la función:
-
-void mainImage(out vec4 fragColor, in vec2 fragCoord)
-Este sería el código adaptado para ShaderToy:
-
-#define PI 3.14159265359
-
-// COLORES AD ASTRA
-#define VOID_BLACK    vec4(0.015, 0.008, 0.035, 1.0)
-#define NEBULA_PURPLE vec4(0.52, 0.13, 0.95, 1.0)
-#define COSMIC_CYAN   vec4(0.00, 0.92, 0.88, 1.0)
-#define STAR_GOLD     vec4(1.00, 0.72, 0.25, 1.0)
-
-float hash(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
-}
-
-float noise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-
-    float a = hash(i);
-    float b = hash(i + vec2(1.0, 0.0));
-    float c = hash(i + vec2(0.0, 1.0));
-    float d = hash(i + vec2(1.0, 1.0));
-
-    vec2 u = f * f * (3.0 - 2.0 * f);
-
-    return mix(a, b, u.x)
-         + (c - a) * u.y * (1.0 - u.x)
-         + (d - b) * u.x * u.y;
-}
-
-void mainImage(out vec4 fragColor, in vec2 fragCoord) {
-    vec2 frag = fragCoord.xy;
-
-    // Pixelado suave
-    float pixelSize = 2.0;
-    frag = floor(frag / pixelSize) * pixelSize;
-
-    vec2 uv = (frag - 0.5 * iResolution.xy) / min(iResolution.x, iResolution.y);
-
-    float r = length(uv);
-    float angle = atan(uv.y, uv.x);
-
-    // Espiral / agujero negro
-    float swirl = 3.5 / (r + 0.18);
-    angle += swirl + iTime * 0.22;
-
-    vec2 spiralUV = vec2(cos(angle), sin(angle)) * r;
-
-    // Nebulosa procedural
-    vec2 p = spiralUV * 4.5;
-    p.x += sin(iTime * 0.35 + p.y * 1.7) * 0.45;
-    p.y += cos(iTime * 0.25 + p.x * 1.3) * 0.35;
-
-    float n1 = noise(p * 2.0 + iTime * 0.12);
-    float n2 = noise(p * 5.0 - iTime * 0.08);
-    float nebula = smoothstep(0.18, 0.95, n1 * 0.75 + n2 * 0.45);
-
-    // Centro oscuro
-    float blackHole = smoothstep(0.28, 0.05, r);
-
-    // Anillo de acreción
-    float ring = smoothstep(0.24, 0.20, abs(r - 0.32));
-    ring *= 1.0 + 0.35 * sin(angle * 10.0 + iTime * 2.0);
-
-    // Estrellas pixeladas
-    vec2 starUV = floor(frag / 3.0);
-    float starSeed = hash(starUV);
-    float stars = step(0.995, starSeed);
-    stars *= 0.5 + 0.5 * sin(iTime * 4.0 + starSeed * 20.0);
-
-    vec4 color = VOID_BLACK;
-
-    color = mix(color, NEBULA_PURPLE, nebula * 0.75);
-    color = mix(color, COSMIC_CYAN, n2 * 0.35);
-    color += STAR_GOLD * ring * 0.55;
-    color += vec4(vec3(stars), 1.0);
-
-    // Agujero negro central
-    color = mix(color, vec4(0.0, 0.0, 0.0, 1.0), blackHole);
-
-    // Viñeta
-    float vignette = smoothstep(1.15, 0.25, r);
-    color.rgb *= vignette;
-
-    // Pulso cósmico
-    color.rgb *= 0.92 + 0.08 * sin(iTime * 1.5);
-
-    fragColor = color;
-}
-En ShaderToy haz esto:
-
-Entra en un shader nuevo.
-
-Borra todo el código que venga por defecto.
-
-Pega este código completo.
-
-Pulsa Compile o espera a que compile solo.
-
-No necesitas cargar texturas ni usar canales iChannel0. Este fondo es 100% procedural, así que debería funcionar directamente.
-
-Los colores los cambias aquí:
-
-#define VOID_BLACK    vec4(0.015, 0.008, 0.035, 1.0)
-#define NEBULA_PURPLE vec4(0.52, 0.13, 0.95, 1.0)
-#define COSMIC_CYAN   vec4(0.00, 0.92, 0.88, 1.0)
-#define STAR_GOLD     vec4(1.00, 0.72, 0.25, 1.0)
-Este te sirve para probar la estética. Luego, cuando tengamos una versión que te guste, la adaptamos a formato .fs para Balatro/LÖVE.
-
-
-me han dado el shader:
-
-#define PIXEL_SIZE_FAC 700.0
-#define SPIN_EASE 0.5
-#define colour_2 vec4(0.0,156./255.,1.,1.0)
-#define colour_1 vec4(0.85,0.2,0.2,1.0)
-#define colour_3 vec4(0.0,0.0,0.0,1.0)
-#define spin_amount 0.7
-#define contrast 1.5
-
-void mainImage( out vec4 fragColor, in vec2 fragCoord )
-{
-     //Convert to UV coords (0-1) and floor for pixel effect
-    float pixel_size = length(iResolution.xy)/PIXEL_SIZE_FAC;
-    vec2 uv = (floor(fragCoord.xy*(1.0/pixel_size))*pixel_size - 0.5*iResolution.xy)/length(iResolution.xy) - vec2(0.0, 0.0);
-    float uv_len = length(uv);
-
-    //Adding in a center swirl, changes with iTime. Only applies meaningfully if the 'spin amount' is a non-zero number
-    float speed = (iTime*SPIN_EASE*0.1) + 302.2;
-    float new_pixel_angle = (atan(uv.y, uv.x)) + speed - SPIN_EASE*20.*(1.*spin_amount*uv_len + (1. - 1.*spin_amount));
-    vec2 mid = (iResolution.xy/length(iResolution.xy))/2.;
-    uv = (vec2((uv_len * cos(new_pixel_angle) + mid.x), (uv_len * sin(new_pixel_angle) + mid.y)) - mid);
-
-	//Now add the paint effect to the swirled UV
-    uv *= 30.;
-    speed = iTime*(1.);
-	vec2 uv2 = vec2(uv.x+uv.y);
-
-    for(int i=0; i < 5; i++) {
-		uv2 += uv + cos(length(uv));
-		uv  += 0.5*vec2(cos(5.1123314 + 0.353*uv2.y + speed*0.131121),sin(uv2.x - 0.113*speed));
-		uv  -= 1.0*cos(uv.x + uv.y) - 1.0*sin(uv.x*0.711 - uv.y);
-	}
-
-    //Make the paint amount range from 0 - 2
-    float contrast_mod = (0.25*contrast + 0.5*spin_amount + 1.2);
-	float paint_res =min(2., max(0.,length(uv)*(0.035)*contrast_mod));
-    float c1p = max(0.,1. - contrast_mod*abs(1.-paint_res));
-    float c2p = max(0.,1. - contrast_mod*abs(paint_res));
-    float c3p = 1. - min(1., c1p + c2p);
-
-    vec4 ret_col = (0.3/contrast)*colour_1 + (1. - 0.3/contrast)*(colour_1*c1p + colour_2*c2p + vec4(c3p*colour_3.rgb, c3p*colour_1.a)) + 0.3*max(c1p*5. - 4., 0.) + 0.4*max(c2p*5. - 4., 0.);
-
-    fragColor = ret_col;
-}
-
-rehaz esto para que los colores sean azul violeta y rosa
-
-Thought for a couple of seconds
-Sí, claro.
-Te lo rehago directamente con una paleta azul + violeta + rosa.
-
-He puesto:
-
-colour_1 = azul eléctrico
-
-colour_2 = violeta
-
-colour_3 = rosa intenso
-
-#define PIXEL_SIZE_FAC 700.0
-#define SPIN_EASE 0.5
-
-// NUEVA PALETA: azul, violeta y rosa
-#define colour_1 vec4(0.10, 0.45, 1.00, 1.0)   // azul
-#define colour_2 vec4(0.55, 0.20, 0.95, 1.0)   // violeta
-#define colour_3 vec4(1.00, 0.20, 0.70, 1.0)   // rosa
-
-#define spin_amount 0.7
-#define contrast 1.5
-
-void mainImage( out vec4 fragColor, in vec2 fragCoord )
-{
-    // Convert to UV coords (0-1) and floor for pixel effect
-    float pixel_size = length(iResolution.xy)/PIXEL_SIZE_FAC;
-    vec2 uv = (floor(fragCoord.xy*(1.0/pixel_size))*pixel_size - 0.5*iResolution.xy)/length(iResolution.xy) - vec2(0.0, 0.0);
-    float uv_len = length(uv);
-
-    // Adding in a center swirl, changes with iTime
-    float speed = (iTime*SPIN_EASE*0.1) + 302.2;
-    float new_pixel_angle = (atan(uv.y, uv.x)) + speed - SPIN_EASE*20.*(1.*spin_amount*uv_len + (1. - 1.*spin_amount));
-    vec2 mid = (iResolution.xy/length(iResolution.xy))/2.;
-    uv = (vec2((uv_len * cos(new_pixel_angle) + mid.x), (uv_len * sin(new_pixel_angle) + mid.y)) - mid);
-
-    // Paint effect
-    uv *= 30.;
-    speed = iTime*(1.);
-    vec2 uv2 = vec2(uv.x+uv.y);
-
-    for(int i=0; i < 5; i++) {
-        uv2 += uv + cos(length(uv));
-        uv  += 0.5*vec2(cos(5.1123314 + 0.353*uv2.y + speed*0.131121), sin(uv2.x - 0.113*speed));
-        uv  -= 1.0*cos(uv.x + uv.y) - 1.0*sin(uv.x*0.711 - uv.y);
-    }
-
-    // Make the paint amount range from 0 - 2
-    float contrast_mod = (0.25*contrast + 0.5*spin_amount + 1.2);
-    float paint_res = min(2., max(0., length(uv)*(0.035)*contrast_mod));
-    float c1p = max(0., 1. - contrast_mod*abs(1.-paint_res));
-    float c2p = max(0., 1. - contrast_mod*abs(paint_res));
-    float c3p = 1. - min(1., c1p + c2p);
-
-    vec4 ret_col = 
-        (0.3/contrast)*colour_1 +
-        (1. - 0.3/contrast)*
-        (colour_1*c1p + colour_2*c2p + vec4(c3p*colour_3.rgb, c3p*colour_1.a)) +
-        0.3*max(c1p*5. - 4., 0.) +
-        0.4*max(c2p*5. - 4., 0.);
-
-    fragColor = ret_col;
-}
-Si quieres, también te puedo hacer ahora mismo 2 variantes más:
-
-más oscura y cósmica
-
-más neón / synthwave
-
-Yo para Ad Astra te recomendaría una versión un poco más cósmica, por ejemplo:
-
-azul profundo
-
-violeta espacial
-
-rosa/magenta nebular
-
-Si quieres, te hago la versión “Ad Astra definitiva” con una paleta más fina.
-
-
-{F3AF77D0-4533-41EC-AFF8-211779671EA4}.png
- estaría mejor que se asemejase al de balatro y fuese mas oscuro, mas "cosmico" nebuloso
-
-Pensó durante 14s
-Sí, lo que te está pasando es que la paleta actual está demasiado clara y saturada, por eso se va a “chicle/neón” en vez de parecerse al fondo oscuro de Balatro.
-
-Prueba esta versión completa. Mantiene el efecto tipo Balatro, pero con una paleta más oscura, cósmica, azul/violeta, con toques magenta y un viñeteado más fuerte.
-
-#define PIXEL_SIZE_FAC 700.0
-#define SPIN_EASE 0.5
-
-// AD ASTRA - paleta oscura cósmica
-#define colour_1 vec4(0.035, 0.055, 0.180, 1.0)  // azul profundo
-#define colour_2 vec4(0.330, 0.110, 0.620, 1.0)  // violeta nebulosa
-#define colour_3 vec4(0.005, 0.002, 0.018, 1.0)  // negro vacío
-
-#define accent_cyan vec4(0.000, 0.620, 0.900, 1.0)
-#define accent_pink vec4(0.850, 0.120, 0.650, 1.0)
-
-#define spin_amount 0.72
-#define contrast 2.1
-
-float hash(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
-}
-
-void mainImage( out vec4 fragColor, in vec2 fragCoord )
-{
-    float pixel_size = length(iResolution.xy) / PIXEL_SIZE_FAC;
-
-    vec2 pixelCoord = floor(fragCoord.xy * (1.0 / pixel_size)) * pixel_size;
-
-    vec2 uv = (pixelCoord - 0.5 * iResolution.xy) / length(iResolution.xy);
-    float uv_len = length(uv);
-
-    // Giro central tipo Balatro
-    float speed = (iTime * SPIN_EASE * 0.1) + 302.2;
-
-    float new_pixel_angle =
-        atan(uv.y, uv.x)
-        + speed
-        - SPIN_EASE * 20.0 * (spin_amount * uv_len + (1.0 - spin_amount));
-
-    vec2 mid = (iResolution.xy / length(iResolution.xy)) / 2.0;
-
-    uv = vec2(
-        uv_len * cos(new_pixel_angle) + mid.x,
-        uv_len * sin(new_pixel_angle) + mid.y
-    ) - mid;
-
-    // Efecto pintura / nebulosa
-    uv *= 30.0;
-    speed = iTime;
-
-    vec2 uv2 = vec2(uv.x + uv.y);
-
-    for(int i = 0; i < 5; i++) {
-        uv2 += uv + cos(length(uv));
-
-        uv += 0.5 * vec2(
-            cos(5.1123314 + 0.353 * uv2.y + speed * 0.131121),
-            sin(uv2.x - 0.113 * speed)
-        );
-
-        uv -= 1.0 * cos(uv.x + uv.y)
-            - 1.0 * sin(uv.x * 0.711 - uv.y);
-    }
-
-    float contrast_mod = 0.25 * contrast + 0.5 * spin_amount + 1.2;
-
-    float paint_res = min(
-        2.0,
-        max(0.0, length(uv) * 0.035 * contrast_mod)
-    );
-
-    float c1p = max(0.0, 1.0 - contrast_mod * abs(1.0 - paint_res));
-    float c2p = max(0.0, 1.0 - contrast_mod * abs(paint_res));
-    float c3p = 1.0 - min(1.0, c1p + c2p);
-
-    vec4 ret_col =
-        (0.18 / contrast) * colour_1
-        + (1.0 - 0.18 / contrast)
-        * (
-            colour_1 * c1p
-            + colour_2 * c2p
-            + vec4(c3p * colour_3.rgb, c3p * colour_1.a)
-        );
-
-    // Brillos controlados, menos lavados que antes
-    ret_col += 0.12 * accent_cyan * max(c1p * 5.0 - 4.15, 0.0);
-    ret_col += 0.16 * accent_pink * max(c2p * 5.0 - 4.10, 0.0);
-
-    // Viñeteado oscuro para acercarlo más al fondo de Balatro
-    vec2 screen_uv = fragCoord.xy / iResolution.xy;
-    vec2 centered = screen_uv - 0.5;
-    centered.x *= iResolution.x / iResolution.y;
-
-    float vignette = smoothstep(0.95, 0.20, length(centered));
-    ret_col.rgb *= vignette;
-
-    // Oscurecimiento general
-    ret_col.rgb *= 0.78;
-
-    // Pequeñas estrellas pixeladas muy sutiles
-    vec2 star_grid = floor(pixelCoord / 5.0);
-    float star = step(0.9975, hash(star_grid));
-    star *= 0.35 + 0.65 * sin(iTime * 3.0 + hash(star_grid + 7.0) * 6.2831);
-
-    ret_col.rgb += vec3(star) * vec3(0.45, 0.55, 0.85);
-
-    // Corrección final para que no quede pastel
-    ret_col.rgb = pow(ret_col.rgb, vec3(1.18));
-
-    fragColor = ret_col;
-}
-La parte clave es esta:
-
-#define colour_1 vec4(0.035, 0.055, 0.180, 1.0)
-#define colour_2 vec4(0.330, 0.110, 0.620, 1.0)
-#define colour_3 vec4(0.005, 0.002, 0.018, 1.0)
-Antes tenías colores muy altos, tipo:
-
-vec4(1.00, 0.20, 0.70, 1.0)
-Eso hace que casi toda la pantalla se vuelva rosa/lila brillante. Para que parezca más Balatro + Ad Astra, el truco es que el tercer color sea casi negro y que los acentos cian/rosa aparezcan solo como brillos, no como color base.
-
-
-{2E85D736-FF57-4464-B480-96F0DC3D6986}.png
- me mola lo que veo, pero le falta algo de rosa, azul...
-
-Thought for a couple of seconds
-Sí, ahora está muy bonito de base, pero se ha ido un poco demasiado al violeta oscuro.
-Lo que le falta es más presencia controlada de:
-
-azul cósmico
-
-rosa nebulosa
-
-sin perder el fondo oscuro tipo Balatro
-
-Te dejo una versión ajustada para eso:
-más azul y rosa, pero manteniendo el negro/violeta como base.
-
-Versión reajustada
-#define PIXEL_SIZE_FAC 700.0
-#define SPIN_EASE 0.5
-
-// AD ASTRA - base oscura tipo Balatro
-#define colour_1 vec4(0.040, 0.075, 0.220, 1.0)  // azul profundo
-#define colour_2 vec4(0.360, 0.120, 0.650, 1.0)  // violeta nebulosa
-#define colour_3 vec4(0.006, 0.003, 0.020, 1.0)  // negro vacío
-
-// acentos más visibles
-#define accent_blue vec4(0.080, 0.520, 1.000, 1.0)
-#define accent_cyan vec4(0.000, 0.760, 0.980, 1.0)
-#define accent_pink vec4(0.980, 0.180, 0.700, 1.0)
-
-#define spin_amount 0.72
-#define contrast 2.0
-
-float hash(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
-}
-
-void mainImage( out vec4 fragColor, in vec2 fragCoord )
-{
-    float pixel_size = length(iResolution.xy) / PIXEL_SIZE_FAC;
-    vec2 pixelCoord = floor(fragCoord.xy * (1.0 / pixel_size)) * pixel_size;
-
-    vec2 uv = (pixelCoord - 0.5 * iResolution.xy) / length(iResolution.xy);
-    float uv_len = length(uv);
-
-    // Giro central tipo Balatro
-    float speed = (iTime * SPIN_EASE * 0.1) + 302.2;
-
-    float new_pixel_angle =
-        atan(uv.y, uv.x)
-        + speed
-        - SPIN_EASE * 20.0 * (spin_amount * uv_len + (1.0 - spin_amount));
-
-    vec2 mid = (iResolution.xy / length(iResolution.xy)) / 2.0;
-
-    uv = vec2(
-        uv_len * cos(new_pixel_angle) + mid.x,
-        uv_len * sin(new_pixel_angle) + mid.y
-    ) - mid;
-
-    // Efecto pintura / nebulosa
-    uv *= 30.0;
-    speed = iTime;
-
-    vec2 uv2 = vec2(uv.x + uv.y);
-
-    for(int i = 0; i < 5; i++) {
-        uv2 += uv + cos(length(uv));
-
-        uv += 0.5 * vec2(
-            cos(5.1123314 + 0.353 * uv2.y + speed * 0.131121),
-            sin(uv2.x - 0.113 * speed)
-        );
-
-        uv -= 1.0 * cos(uv.x + uv.y)
-            - 1.0 * sin(uv.x * 0.711 - uv.y);
-    }
-
-    float contrast_mod = 0.25 * contrast + 0.5 * spin_amount + 1.2;
-
-    float paint_res = min(
-        2.0,
-        max(0.0, length(uv) * 0.035 * contrast_mod)
-    );
-
-    float c1p = max(0.0, 1.0 - contrast_mod * abs(1.0 - paint_res));
-    float c2p = max(0.0, 1.0 - contrast_mod * abs(paint_res));
-    float c3p = 1.0 - min(1.0, c1p + c2p);
-
-    vec4 ret_col =
-        (0.20 / contrast) * colour_1
-        + (1.0 - 0.20 / contrast)
-        * (
-            colour_1 * c1p
-            + colour_2 * c2p
-            + vec4(c3p * colour_3.rgb, c3p * colour_1.a)
-        );
-
-    // Más riqueza cromática: azul y rosa más presentes
-    ret_col.rgb = mix(ret_col.rgb, accent_blue.rgb, 0.12 * c1p);
-    ret_col.rgb = mix(ret_col.rgb, accent_pink.rgb, 0.16 * c2p);
-
-    // Brillos más visibles
-    ret_col += 0.18 * accent_cyan * max(c1p * 5.0 - 4.10, 0.0);
-    ret_col += 0.24 * accent_pink * max(c2p * 5.0 - 4.05, 0.0);
-    ret_col += 0.12 * accent_blue * max((c1p + c2p) * 2.2 - 1.6, 0.0);
-
-    // Nebulosidad extra suave
-    float glow = smoothstep(0.95, 0.15, uv_len);
-    ret_col.rgb += vec3(0.04, 0.02, 0.08) * glow;
-    ret_col.rgb += accent_blue.rgb * 0.03 * glow;
-    ret_col.rgb += accent_pink.rgb * 0.025 * glow;
-
-    // Viñeteado oscuro
-    vec2 screen_uv = fragCoord.xy / iResolution.xy;
-    vec2 centered = screen_uv - 0.5;
-    centered.x *= iResolution.x / iResolution.y;
-
-    float vignette = smoothstep(0.98, 0.22, length(centered));
-    ret_col.rgb *= vignette;
-
-    // Oscurecimiento general un poco menos agresivo
-    ret_col.rgb *= 0.88;
-
-    // Estrellas pixeladas sutiles
-    vec2 star_grid = floor(pixelCoord / 5.0);
-    float star = step(0.9975, hash(star_grid));
-    star *= 0.35 + 0.65 * sin(iTime * 3.0 + hash(star_grid + 7.0) * 6.2831);
-
-    ret_col.rgb += vec3(star) * vec3(0.45, 0.60, 0.95);
-
-    // Ajuste final
-    ret_col.rgb = pow(ret_col.rgb, vec3(1.08));
-
-    fragColor = ret_col;
-}
-Qué he cambiado exactamente
-1. Más azul en la base
-Antes el azul estaba muy hundido. Ahora:
-
-#define colour_1 vec4(0.040, 0.075, 0.220, 1.0)
-Tiene más presencia.
-
-2. Rosa más visible, pero como acento
-Le he subido el empuje aquí:
-
-#define accent_pink vec4(0.980, 0.180, 0.700, 1.0)
-Y además lo mezclo en el color, no solo en el brillo.
-
-3. Menos apagado general
-Antes se oscurecía demasiado con:
-
-ret_col.rgb *= 0.78;
-Ahora queda en:
-
-ret_col.rgb *= 0.88;
-Así respira más el azul y el rosa.
-
-Si lo quieres aún más “Balatro cósmico”
-Si al probarlo quieres:
-
-más azul → sube 0.12 * c1p a 0.18 * c1p
-
-más rosa → sube 0.16 * c2p a 0.22 * c2p
-
-más oscuro → baja 0.88 a 0.82
-
-más brillo nebular → sube 0.24 * accent_pink a 0.30
-
-Si quieres, el siguiente paso te lo hago yo directamente:
-te preparo una versión final “Ad Astra” con un look:
-
-más fiel al Balatro original, o
-
-más agujero negro / vacío / antimateria.
-
-
-{4C51B81E-803C-4884-A8C3-5A13D7730FD4}.png
- algo más rosita fucsia también? no crees?
-
-Pensó durante 19s
-Sí, totalmente. Ahora mismo está muy bien de base cósmica oscura, pero para Ad Astra le vendría bien un toque más fucsia/magenta nebular, sobre todo en las zonas brillantes del remolino.
-
-No metería el fucsia como color principal de fondo, porque volveríamos al efecto “chicle”. Lo pondría como acento fuerte, mezclado sobre el violeta.
-
-Cambia la parte de colores de arriba por esta:
-
-// AD ASTRA - base oscura tipo Balatro con fucsia cósmico
-#define colour_1 vec4(0.035, 0.070, 0.230, 1.0)  // azul profundo
-#define colour_2 vec4(0.420, 0.080, 0.720, 1.0)  // violeta más magenta
-#define colour_3 vec4(0.004, 0.002, 0.018, 1.0)  // negro vacío
-
-// acentos
-#define accent_blue    vec4(0.070, 0.500, 1.000, 1.0)
-#define accent_cyan    vec4(0.000, 0.760, 0.980, 1.0)
-#define accent_pink    vec4(1.000, 0.120, 0.680, 1.0)
-#define accent_fuchsia vec4(1.000, 0.000, 0.920, 1.0)
-Y luego sustituye esta parte:
-
-// Más riqueza cromática: azul y rosa más presentes
-ret_col.rgb = mix(ret_col.rgb, accent_blue.rgb, 0.12 * c1p);
-ret_col.rgb = mix(ret_col.rgb, accent_pink.rgb, 0.16 * c2p);
-
-// Brillos más visibles
-ret_col += 0.18 * accent_cyan * max(c1p * 5.0 - 4.10, 0.0);
-ret_col += 0.24 * accent_pink * max(c2p * 5.0 - 4.05, 0.0);
-ret_col += 0.12 * accent_blue * max((c1p + c2p) * 2.2 - 1.6, 0.0);
-por esta versión más fucsia:
-
-// Más riqueza cromática: azul + rosa/fucsia más presentes
-ret_col.rgb = mix(ret_col.rgb, accent_blue.rgb,    0.12 * c1p);
-ret_col.rgb = mix(ret_col.rgb, accent_pink.rgb,    0.20 * c2p);
-ret_col.rgb = mix(ret_col.rgb, accent_fuchsia.rgb, 0.10 * max(c2p - 0.15, 0.0));
-
-// Brillos cósmicos más fucsia
-ret_col += 0.18 * accent_cyan    * max(c1p * 5.0 - 4.10, 0.0);
-ret_col += 0.30 * accent_pink    * max(c2p * 5.0 - 4.05, 0.0);
-ret_col += 0.22 * accent_fuchsia * max(c2p * 6.0 - 4.70, 0.0);
-ret_col += 0.12 * accent_blue    * max((c1p + c2p) * 2.2 - 1.6, 0.0);
-Y en la parte de nebulosidad extra, cambia esto:
-
-ret_col.rgb += accent_pink.rgb * 0.025 * glow;
-por esto:
-
-ret_col.rgb += accent_pink.rgb    * 0.035 * glow;
-ret_col.rgb += accent_fuchsia.rgb * 0.025 * glow;
-Con eso debería quedar más en este rollo:
-
-negro vacío + violeta profundo + vetas azuladas + brillos fucsia/magenta.
-
-Si aún lo quieres más fucsia después de probarlo, sube solo este valor:
-
-0.20 * c2p
-a:
-
-0.26 * c2p
-Pero no tocaría mucho más, porque ahora mismo está cerca del punto bueno.
-
-
-dame todo el codigo
-
-Thought for a couple of seconds
-Sí, claro.
-Te dejo todo el shader completo ya integrado, con el look:
-
-oscuro
-
-cósmico / nebuloso
-
-base tipo Balatro
-
-con azules
-
-violetas
-
-y un toque fucsia/magenta más visible
-
-Pégalo tal cual en ShaderToy:
-
-#define PIXEL_SIZE_FAC 700.0
-#define SPIN_EASE 0.5
-
-// AD ASTRA - base oscura tipo Balatro con fucsia cósmico
-#define colour_1 vec4(0.035, 0.070, 0.230, 1.0)  // azul profundo
-#define colour_2 vec4(0.420, 0.080, 0.720, 1.0)  // violeta magenta
-#define colour_3 vec4(0.004, 0.002, 0.018, 1.0)  // negro vacío
-
-// acentos
-#define accent_blue    vec4(0.070, 0.500, 1.000, 1.0)
-#define accent_cyan    vec4(0.000, 0.760, 0.980, 1.0)
-#define accent_pink    vec4(1.000, 0.120, 0.680, 1.0)
-#define accent_fuchsia vec4(1.000, 0.000, 0.920, 1.0)
-
-#define spin_amount 0.72
-#define contrast 2.0
-
-float hash(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
-}
-
-void mainImage(out vec4 fragColor, in vec2 fragCoord)
-{
-    float pixel_size = length(iResolution.xy) / PIXEL_SIZE_FAC;
-    vec2 pixelCoord = floor(fragCoord.xy * (1.0 / pixel_size)) * pixel_size;
-
-    vec2 uv = (pixelCoord - 0.5 * iResolution.xy) / length(iResolution.xy);
-    float uv_len = length(uv);
-
-    // Giro central tipo Balatro
-    float speed = (iTime * SPIN_EASE * 0.1) + 302.2;
-
-    float new_pixel_angle =
-        atan(uv.y, uv.x)
-        + speed
-        - SPIN_EASE * 20.0 * (spin_amount * uv_len + (1.0 - spin_amount));
-
-    vec2 mid = (iResolution.xy / length(iResolution.xy)) / 2.0;
-
-    uv = vec2(
-        uv_len * cos(new_pixel_angle) + mid.x,
-        uv_len * sin(new_pixel_angle) + mid.y
-    ) - mid;
-
-    // Efecto pintura / nebulosa
-    uv *= 30.0;
-    speed = iTime;
-
-    vec2 uv2 = vec2(uv.x + uv.y);
-
-    for (int i = 0; i < 5; i++) {
-        uv2 += uv + cos(length(uv));
-
-        uv += 0.5 * vec2(
-            cos(5.1123314 + 0.353 * uv2.y + speed * 0.131121),
-            sin(uv2.x - 0.113 * speed)
-        );
-
-        uv -= 1.0 * cos(uv.x + uv.y)
-            - 1.0 * sin(uv.x * 0.711 - uv.y);
-    }
-
-    float contrast_mod = 0.25 * contrast + 0.5 * spin_amount + 1.2;
-
-    float paint_res = min(
-        2.0,
-        max(0.0, length(uv) * 0.035 * contrast_mod)
-    );
-
-    float c1p = max(0.0, 1.0 - contrast_mod * abs(1.0 - paint_res));
-    float c2p = max(0.0, 1.0 - contrast_mod * abs(paint_res));
-    float c3p = 1.0 - min(1.0, c1p + c2p);
-
-    vec4 ret_col =
-        (0.20 / contrast) * colour_1
-        + (1.0 - 0.20 / contrast)
-        * (
-            colour_1 * c1p
-            + colour_2 * c2p
-            + vec4(c3p * colour_3.rgb, c3p * colour_1.a)
-        );
-
-    // Más riqueza cromática: azul + rosa/fucsia más presentes
-    ret_col.rgb = mix(ret_col.rgb, accent_blue.rgb,    0.12 * c1p);
-    ret_col.rgb = mix(ret_col.rgb, accent_pink.rgb,    0.20 * c2p);
-    ret_col.rgb = mix(ret_col.rgb, accent_fuchsia.rgb, 0.10 * max(c2p - 0.15, 0.0));
-
-    // Brillos cósmicos más fucsia
-    ret_col += 0.18 * accent_cyan    * max(c1p * 5.0 - 4.10, 0.0);
-    ret_col += 0.30 * accent_pink    * max(c2p * 5.0 - 4.05, 0.0);
-    ret_col += 0.22 * accent_fuchsia * max(c2p * 6.0 - 4.70, 0.0);
-    ret_col += 0.12 * accent_blue    * max((c1p + c2p) * 2.2 - 1.6, 0.0);
-
-    // Nebulosidad extra suave
-    float glow = smoothstep(0.95, 0.15, uv_len);
-    ret_col.rgb += vec3(0.04, 0.02, 0.08) * glow;
-    ret_col.rgb += accent_blue.rgb    * 0.03  * glow;
-    ret_col.rgb += accent_pink.rgb    * 0.035 * glow;
-    ret_col.rgb += accent_fuchsia.rgb * 0.025 * glow;
-
-    // Viñeteado oscuro
-    vec2 screen_uv = fragCoord.xy / iResolution.xy;
-    vec2 centered = screen_uv - 0.5;
-    centered.x *= iResolution.x / iResolution.y;
-
-    float vignette = smoothstep(0.98, 0.22, length(centered));
-    ret_col.rgb *= vignette;
-
-    // Oscurecimiento general
-    ret_col.rgb *= 0.88;
-
-    // Estrellas pixeladas sutiles
-    vec2 star_grid = floor(pixelCoord / 5.0);
-    float star = step(0.9975, hash(star_grid));
-    star *= 0.35 + 0.65 * sin(iTime * 3.0 + hash(star_grid + vec2(7.0, 7.0)) * 6.2831);
-
-    ret_col.rgb += vec3(star) * vec3(0.45, 0.60, 0.95);
-
-    // Ajuste final
-    ret_col.rgb = pow(ret_col.rgb, vec3(1.08));
-
-    fragColor = ret_col;
-}
-Si quieres ajustarlo rápido:
-más fucsia: sube esta línea
-
-ret_col += 0.22 * accent_fuchsia * max(c2p * 6.0 - 4.70, 0.0);
-por ejemplo a:
-
-ret_col += 0.30 * accent_fuchsia * max(c2p * 6.0 - 4.70, 0.0);
-más oscuro:
-
-ret_col.rgb *= 0.88;
-bájalo a:
-
-ret_col.rgb *= 0.80;
-más azul:
-
-ret_col.rgb = mix(ret_col.rgb, accent_blue.rgb, 0.12 * c1p);
-súbelo a:
-
-ret_col.rgb = mix(ret_col.rgb, accent_blue.rgb, 0.18 * c1p);
-Si quieres, el siguiente paso te hago una versión 2 ya enfocada a:
-
-más Balatro original
-o
-
-más “Vacío / agujero negro / antimateria” para Ad Astra.
-
-
-vale, pasable, ashora necesito que me lo transformes a formato html para ponerlo en una github page, me ayudarás a hacer también la github page, entiendo que puedo tener más de una no?
-
-Pensó durante 1m 4s
-He dejado preparado el index.html completo en el canvas con el shader convertido a WebGL puro, sin depender de ShaderToy. Eso te sirve directamente para una GitHub Page: lo subes como index.html y ya renderiza el fondo animado.
-
-Sí, puedes tener más de una GitHub Page, con matiz importante:
-
-GitHub Pages aloja sitios estáticos con HTML, CSS y JavaScript desde un repositorio. 
- Puedes tener una página principal de usuario u organización por cuenta, normalmente en un repositorio llamado tuusuario.github.io, pero también puedes tener páginas de proyecto en otros repositorios, por ejemplo tuusuario.github.io/ad-astra, tuusuario.github.io/mineraldle, etc. GitHub indica explícitamente que solo hay una user/org site por cuenta, pero eso no impide tener sitios de proyecto. 
-
-Para este mod yo haría:
-
-Repositorio:
-ad-astra
-
-Archivo:
-index.html
-
-URL final aproximada:
-https://TU_USUARIO.github.io/ad-astra/
-Y los pasos serían:
-
-Crear un repo público llamado ad-astra.
-
-Subir el index.html.
-
-Ir a Settings → Pages.
-
-En Build and deployment, elegir Deploy from a branch.
-
-Seleccionar rama main y carpeta /root.
-
-Guardar.
-
-GitHub permite publicar desde una rama y elegir como fuente la raíz del repositorio o la carpeta /docs. 
-
-Para probarlo en local antes de subirlo, guarda el archivo como index.html y ábrelo en el navegador. Como es WebGL puro, debería funcionar sin servidor local.
-
-
-No, pero solo quiero el fondo
-
-Ad Astra Github Page
-· html
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -1115,9 +52,212 @@ Ad Astra Github Page
 
     const fragmentShaderSource = `
       precision highp float;
-Pensó durante 31s
-Hecho. He actualizado el index.html para que sea solo el fondo animado, sin título, panel, texto ni elementos encima.
 
-Ahora el archivo sirve como fondo puro para una GitHub Page o para integrarlo luego detrás de una web. Solo renderiza el canvas WebGL a pantalla completa.
+      uniform vec2 iResolution;
+      uniform float iTime;
 
+      #define PIXEL_SIZE_FAC 700.0
+      #define SPIN_EASE 0.5
 
+      // AD ASTRA - fondo oscuro cósmico
+      #define colour_1 vec4(0.035, 0.070, 0.230, 1.0)
+      #define colour_2 vec4(0.420, 0.080, 0.720, 1.0)
+      #define colour_3 vec4(0.004, 0.002, 0.018, 1.0)
+
+      #define accent_blue    vec4(0.070, 0.500, 1.000, 1.0)
+      #define accent_cyan    vec4(0.000, 0.760, 0.980, 1.0)
+      #define accent_pink    vec4(1.000, 0.120, 0.680, 1.0)
+      #define accent_fuchsia vec4(1.000, 0.000, 0.920, 1.0)
+
+      #define spin_amount 0.72
+      #define contrast 2.0
+
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+      }
+
+      void main() {
+        vec2 fragCoord = gl_FragCoord.xy;
+
+        float pixel_size = length(iResolution.xy) / PIXEL_SIZE_FAC;
+        vec2 pixelCoord = floor(fragCoord.xy * (1.0 / pixel_size)) * pixel_size;
+
+        vec2 uv = (pixelCoord - 0.5 * iResolution.xy) / length(iResolution.xy);
+        float uv_len = length(uv);
+
+        float speed = (iTime * SPIN_EASE * 0.1) + 302.2;
+
+        float new_pixel_angle =
+          atan(uv.y, uv.x)
+          + speed
+          - SPIN_EASE * 20.0 * (spin_amount * uv_len + (1.0 - spin_amount));
+
+        vec2 mid = (iResolution.xy / length(iResolution.xy)) / 2.0;
+
+        uv = vec2(
+          uv_len * cos(new_pixel_angle) + mid.x,
+          uv_len * sin(new_pixel_angle) + mid.y
+        ) - mid;
+
+        uv *= 30.0;
+        speed = iTime;
+
+        vec2 uv2 = vec2(uv.x + uv.y);
+
+        for (int i = 0; i < 5; i++) {
+          uv2 += uv + cos(length(uv));
+
+          uv += 0.5 * vec2(
+            cos(5.1123314 + 0.353 * uv2.y + speed * 0.131121),
+            sin(uv2.x - 0.113 * speed)
+          );
+
+          uv -= 1.0 * cos(uv.x + uv.y)
+              - 1.0 * sin(uv.x * 0.711 - uv.y);
+        }
+
+        float contrast_mod = 0.25 * contrast + 0.5 * spin_amount + 1.2;
+
+        float paint_res = min(
+          2.0,
+          max(0.0, length(uv) * 0.035 * contrast_mod)
+        );
+
+        float c1p = max(0.0, 1.0 - contrast_mod * abs(1.0 - paint_res));
+        float c2p = max(0.0, 1.0 - contrast_mod * abs(paint_res));
+        float c3p = 1.0 - min(1.0, c1p + c2p);
+
+        vec4 ret_col =
+          (0.20 / contrast) * colour_1
+          + (1.0 - 0.20 / contrast)
+          * (
+            colour_1 * c1p
+            + colour_2 * c2p
+            + vec4(c3p * colour_3.rgb, c3p * colour_1.a)
+          );
+
+        ret_col.rgb = mix(ret_col.rgb, accent_blue.rgb,    0.12 * c1p);
+        ret_col.rgb = mix(ret_col.rgb, accent_pink.rgb,    0.20 * c2p);
+        ret_col.rgb = mix(ret_col.rgb, accent_fuchsia.rgb, 0.10 * max(c2p - 0.15, 0.0));
+
+        ret_col += 0.18 * accent_cyan    * max(c1p * 5.0 - 4.10, 0.0);
+        ret_col += 0.30 * accent_pink    * max(c2p * 5.0 - 4.05, 0.0);
+        ret_col += 0.22 * accent_fuchsia * max(c2p * 6.0 - 4.70, 0.0);
+        ret_col += 0.12 * accent_blue    * max((c1p + c2p) * 2.2 - 1.6, 0.0);
+
+        float glow = smoothstep(0.95, 0.15, uv_len);
+        ret_col.rgb += vec3(0.04, 0.02, 0.08) * glow;
+        ret_col.rgb += accent_blue.rgb    * 0.030 * glow;
+        ret_col.rgb += accent_pink.rgb    * 0.035 * glow;
+        ret_col.rgb += accent_fuchsia.rgb * 0.025 * glow;
+
+        vec2 screen_uv = fragCoord.xy / iResolution.xy;
+        vec2 centered = screen_uv - 0.5;
+        centered.x *= iResolution.x / iResolution.y;
+
+        float vignette = smoothstep(0.98, 0.22, length(centered));
+        ret_col.rgb *= vignette;
+
+        ret_col.rgb *= 0.88;
+
+        vec2 star_grid = floor(pixelCoord / 5.0);
+        float star_hash = hash(star_grid);
+        float star = step(0.9975, star_hash);
+        star *= 0.35 + 0.65 * sin(iTime * 3.0 + hash(star_grid + vec2(7.0, 7.0)) * 6.2831);
+
+        ret_col.rgb += vec3(star) * vec3(0.45, 0.60, 0.95);
+        ret_col.rgb = pow(ret_col.rgb, vec3(1.08));
+
+        gl_FragColor = ret_col;
+      }
+    `;
+
+    function createShader(type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        const info = gl.getShaderInfoLog(shader);
+        gl.deleteShader(shader);
+        throw new Error("Shader compile error: " + info);
+      }
+
+      return shader;
+    }
+
+    function createProgram(vertexSource, fragmentSource) {
+      const vertexShader = createShader(gl.VERTEX_SHADER, vertexSource);
+      const fragmentShader = createShader(gl.FRAGMENT_SHADER, fragmentSource);
+      const program = gl.createProgram();
+
+      gl.attachShader(program, vertexShader);
+      gl.attachShader(program, fragmentShader);
+      gl.linkProgram(program);
+
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        const info = gl.getProgramInfoLog(program);
+        gl.deleteProgram(program);
+        throw new Error("Program link error: " + info);
+      }
+
+      return program;
+    }
+
+    const program = createProgram(vertexShaderSource, fragmentShaderSource);
+    const positionLocation = gl.getAttribLocation(program, "a_position");
+    const resolutionLocation = gl.getUniformLocation(program, "iResolution");
+    const timeLocation = gl.getUniformLocation(program, "iTime");
+
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array([
+        -1, -1,
+         1, -1,
+        -1,  1,
+        -1,  1,
+         1, -1,
+         1,  1
+      ]),
+      gl.STATIC_DRAW
+    );
+
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const width = Math.floor(window.innerWidth * dpr);
+      const height = Math.floor(window.innerHeight * dpr);
+
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+        canvas.style.width = window.innerWidth + "px";
+        canvas.style.height = window.innerHeight + "px";
+        gl.viewport(0, 0, width, height);
+      }
+    }
+
+    const startTime = performance.now();
+
+    function render() {
+      resize();
+
+      const time = (performance.now() - startTime) / 1000;
+
+      gl.useProgram(program);
+      gl.enableVertexAttribArray(positionLocation);
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+      gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
+      gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
+      gl.uniform1f(timeLocation, time);
+
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      requestAnimationFrame(render);
+    }
+
+    render();
+  </script>
+</body>
+</html>
